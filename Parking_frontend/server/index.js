@@ -1,0 +1,106 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+// Add this import with other imports
+import paymentRoutes from './routes/payment.js';
+
+// Add this line after other route registrations
+app.use('/api/payment', authenticateToken, paymentRoutes);
+
+dotenv.config();
+
+console.log('🔧 Loading modules...');
+
+// Import routes
+let authRoutes, parkingRoutes, vehicleRoutes, analyticsRoutes, authenticateToken, adminRoutes;
+
+try {
+  const authModule = await import('./routes/auth.js');
+  authRoutes = authModule.default;
+  console.log('✅ Auth routes loaded');
+} catch (err) {
+  console.error('❌ Failed to load auth routes:', err.message);
+  process.exit(1);
+}
+
+try {
+  const parkingModule = await import('./routes/parking.js');
+  parkingRoutes = parkingModule.default;
+  console.log('✅ Parking routes loaded');
+} catch (err) {
+  console.error('❌ Failed to load parking routes:', err.message);
+  process.exit(1);
+}
+
+try {
+  const vehicleModule = await import('./routes/vehicles.js');
+  vehicleRoutes = vehicleModule.default;
+  console.log('✅ Vehicle routes loaded');
+} catch (err) {
+  console.error('❌ Failed to load vehicle routes:', err.message);
+  process.exit(1);
+}
+
+try {
+  const analyticsModule = await import('./routes/analytics.js');
+  analyticsRoutes = analyticsModule.default;
+  console.log('✅ Analytics routes loaded');
+} catch (err) {
+  console.error('❌ Failed to load analytics routes:', err.message);
+  process.exit(1);
+}
+
+try {
+  const authMiddleware = await import('./middleware/auth.js');
+  authenticateToken = authMiddleware.authenticateToken;
+  console.log('✅ Auth middleware loaded');
+} catch (err) {
+  console.error('❌ Failed to load auth middleware:', err.message);
+  process.exit(1);
+}
+
+try {
+  const adminModule = await import('./routes/admin.js');
+  adminRoutes = adminModule.default;
+  console.log('✅ Admin routes loaded');
+} catch (err) {
+  console.error('❌ Failed to load admin routes:', err.message);
+  process.exit(1);
+}
+
+// ✅ CREATE APP HERE - AFTER all imports
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes - THESE MUST COME AFTER app is created
+app.use('/api/auth', authRoutes);
+app.use('/api/parking', authenticateToken, parkingRoutes);
+app.use('/api/vehicles', authenticateToken, vehicleRoutes);
+app.use('/api/analytics', authenticateToken, analyticsRoutes);
+app.use('/api/admin', authenticateToken, adminRoutes);  // ✅ This line must be AFTER const app = express()
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Smart Parking API is running' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err.stack);
+  res.status(500).json({ 
+    success: false, 
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
